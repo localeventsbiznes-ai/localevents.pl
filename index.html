@@ -40,7 +40,11 @@
     -moz-osx-font-smoothing:grayscale;
     line-height:1.45;
   }
-  .container{max-width:var(--container);margin:0 auto;padding:28px}
+  .container{max-width:var(--container);margin:0 auto;padding:28px;position:relative;z-index:20}
+  /* full-screen background map */
+  #bg-map{position:fixed;inset:0;width:100%;height:100%;z-index:0}
+  /* ensure main content sits above the map */
+  main, header, footer{position:relative;z-index:20}
   .site-header .social-link{display:inline-flex;align-items:center;gap:8px;color:var(--muted);text-decoration:none}
   .site-header .social-link svg{height:18px;width:18px;opacity:0.95}
   header.site-header{position:sticky;top:0;background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));backdrop-filter:blur(6px);border-bottom:1px solid rgba(255,255,255,0.02);z-index:60}
@@ -114,6 +118,7 @@
   </style>
 </head>
 <body>
+  <div id="bg-map" aria-hidden="true"></div>
   <header class="site-header">
     <div class="container header-inner">
       <div class="logo" aria-label="localevents.pl">
@@ -160,9 +165,7 @@
           </form>
         </div>
 
-        <div class="hero-mock" aria-hidden="false">
-          <div id="map" role="region" aria-label="Interaktywna mapa wydarzeń"></div>
-        </div>
+        <div class="hero-mock" aria-hidden="true"></div>
       </div>
     </section>
 
@@ -234,41 +237,71 @@
     <div class="container footer-inner">
       <div>© localevents.pl • Wszystkie prawa zastrzeżone</div>
       <div class="socials">
-        <a href="https://instagram.com/localevents_official" target="_blank" rel="noopener">Instagram</a>
+        <a href="https://instagram.com/localevents_official" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style="height:16px;vertical-align:middle;margin-right:6px"><path d="M7 2h10a5 5 0 0 1 5 5v10a5 5 0 0 1-5 5H7a5 5 0 0 1-5-5V7a5 5 0 0 1 5-5z" stroke="#cbd5e1" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 11.37a4 4 0 1 1-2.63-3.75" stroke="#cbd5e1" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Instagram
+        </a>
         <a href="#" target="_blank" rel="noopener">Facebook</a>
       </div>
     </div>
   </footer>
 
   <script>
-  // Load Leaflet JS dynamically (in case CDN is blocked)
+  // Load Leaflet JS dynamically and initialize a full-screen animated background map
   (function(){
-    const s=document.createElement('script');s.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';s.defer=true;document.head.appendChild(s);
+    const s=document.createElement('script');
+    s.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    s.defer=true;document.head.appendChild(s);
     s.onload=function(){
-      // initialize map
-      const map = L.map('map',{center:[52.2297,21.0122],zoom:13,zoomControl:true});
+      const center = [52.2297,21.0122];
+      const map = L.map('bg-map',{
+        center:center,
+        zoom:13,
+        zoomControl:false,
+        attributionControl:false,
+        keyboard:false,
+        scrollWheelZoom:false,
+        doubleClickZoom:false,
+        dragging:false
+      }).setView(center,13);
+
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:''}).addTo(map);
 
-      // sample events (lat, lng, title, desc)
+      // sample events
       const events = [
         {lat:52.231, lng:21.011, title:'Koncert jazzowy', desc:'Klub muzyczny — bilety od 40 zł'},
         {lat:52.226, lng:21.015, title:'Targi lokalne', desc:'Stoiska, jedzenie, rękodzieło'},
         {lat:52.235, lng:21.005, title:'Warsztaty fotograficzne', desc:'Bezpłatne miejsce — zapisy online'}
       ];
 
-      events.forEach(e=>{
+      const markers = [];
+      events.forEach((e,i)=>{
         const icon = L.divIcon({className:'', html:'<div class="pulse-marker" aria-hidden="true"></div>',iconSize:[36,36],iconAnchor:[18,18]});
-        const m = L.marker([e.lat,e.lng],{icon}).addTo(map);
+        const m = L.marker([e.lat,e.lng],{icon,interactive:true}).addTo(map);
         m.bindPopup(`<strong>${e.title}</strong><div style=\"margin-top:6px;color:var(--muted)\">${e.desc}</div>`);
+        markers.push({marker:m,base:[e.lat,e.lng]});
       });
 
-      // make map responsive height adjustments
-      function resizeMap(){
-        const h = Math.min(window.innerHeight*0.7,560);
-        document.getElementById('map').style.height = h + 'px';
-        map.invalidateSize();
+      // subtle drifting animation for the map center and jitter for markers
+      let t = 0;
+      function animate(){
+        t += 0.003;
+        const offsetLat = Math.sin(t)*0.0009;
+        const offsetLng = Math.cos(t*0.9)*0.0009;
+        map.setView([center[0]+offsetLat, center[1]+offsetLng], map.getZoom(), {animate:true, duration:4});
+
+        markers.forEach((o,idx)=>{
+          const jitterLat = Math.sin(t*(1+idx*0.4)+idx)*0.0006;
+          const jitterLng = Math.cos(t*(1.1+idx*0.3)+idx)*0.0006;
+          o.marker.setLatLng([o.base[0]+jitterLat, o.base[1]+jitterLng]);
+        });
+
+        requestAnimationFrame(animate);
       }
-      window.addEventListener('resize',resizeMap);resizeMap();
+      requestAnimationFrame(animate);
+
+      // style map canvas slightly dimmed so UI text reads well
+      map.getContainer().style.filter = 'brightness(0.86) contrast(0.96)';
     };
   })();
 
