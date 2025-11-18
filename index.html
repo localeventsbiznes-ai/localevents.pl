@@ -41,13 +41,16 @@
     line-height:1.45;
   }
   .container{max-width:var(--container);margin:0 auto;padding:28px;position:relative;z-index:20}
+  /* panels overlay to improve readability over background map */
+  .panel{background:linear-gradient(180deg, rgba(7,20,38,0.72), rgba(7,20,38,0.64));border-radius:14px;padding:28px;border:1px solid rgba(255,255,255,0.04);backdrop-filter:blur(6px)}
+  .site-logo{height:34px;display:inline-block}
   /* full-screen background map */
   #bg-map{position:fixed;inset:0;width:100%;height:100%;z-index:0}
   /* ensure main content sits above the map */
   main, header, footer{position:relative;z-index:20}
   .site-header .social-link{display:inline-flex;align-items:center;gap:8px;color:var(--muted);text-decoration:none}
   .site-header .social-link svg{height:18px;width:18px;opacity:0.95}
-  header.site-header{position:sticky;top:0;background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));backdrop-filter:blur(6px);border-bottom:1px solid rgba(255,255,255,0.02);z-index:60}
+  header.site-header{position:sticky;top:0;background:linear-gradient(180deg, rgba(4,10,18,0.72), rgba(4,10,18,0.55));backdrop-filter:blur(8px);border-bottom:1px solid rgba(255,255,255,0.03);z-index:60}
   .header-inner{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:10px 0}
   .logo{display:flex;align-items:center;gap:10px;font-weight:700}
   .logo svg{height:28px}
@@ -122,11 +125,8 @@
   <header class="site-header">
     <div class="container header-inner">
       <div class="logo" aria-label="localevents.pl">
-        <!-- LOGO SVG: zamień na własne SVG jeśli chcesz -->
-        <svg width="140" height="28" viewBox="0 0 140 28" xmlns="http://www.w3.org/2000/svg" role="img" aria-hidden="true">
-          <rect width="140" height="28" rx="6" fill="#071428"></rect>
-          <text x="12" y="19" font-family="Inter, Arial" font-size="14" fill="#ff5a5f" font-weight="700">localevents.pl</text>
-        </svg>
+        <!-- Use project logo (replace /assets/logo.svg with your provided file) -->
+        <img src="/assets/logo.svg" alt="localevents.pl logo" class="site-logo"/>
       </div>
       <nav class="nav" aria-label="Główne">
         <a href="#features">Funkcje</a>
@@ -141,7 +141,7 @@
   </header>
 
   <main>
-    <section class="hero" aria-labelledby="hero-heading">
+    <section class="hero panel" aria-labelledby="hero-heading">
       <div class="container hero-inner">
         <div class="hero-text">
           <h1 id="hero-heading">Znajdź to, co dzieje się tu i teraz.</h1>
@@ -169,7 +169,7 @@
       </div>
     </section>
 
-    <section id="features" class="features container" aria-labelledby="features-heading">
+    <section id="features" class="features container panel" aria-labelledby="features-heading">
       <h2 id="features-heading">Co oferujemy</h2>
       <div class="grid">
         <div class="card reveal">
@@ -191,7 +191,7 @@
       </div>
     </section>
 
-    <section id="for-business" class="for-business container" aria-labelledby="business-heading">
+    <section id="for-business" class="for-business container panel" aria-labelledby="business-heading">
       <h2 id="business-heading">Dlaczego warto jako firma?</h2>
       <ul class="benefits">
         <li>Szybkie wypełnianie wolnych terminów</li>
@@ -202,7 +202,7 @@
       <a class="btn btn-primary" href="#contact">Porozmawiaj z nami</a>
     </section>
 
-    <section id="how" class="how container" aria-labelledby="how-heading">
+    <section id="how" class="how container panel" aria-labelledby="how-heading">
       <h2 id="how-heading">Jak to działa</h2>
       <div class="grid">
         <div class="step card reveal">
@@ -220,7 +220,7 @@
       </div>
     </section>
 
-    <section id="contact" class="contact container" aria-labelledby="contact-heading">
+    <section id="contact" class="contact container panel" aria-labelledby="contact-heading">
       <h2 id="contact-heading">Kontakt</h2>
       <p>Chcesz testować jako firma lub zostać partnerem? Napisz do nas.</p>
       <!-- Contact form - standard POST (replace action with your backend) -->
