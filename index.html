@@ -1,487 +1,512 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="pl">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>localevents.pl — Znajdź wydarzenia i promocje tu i teraz</title>
-  <meta name="description" content="Local Events — mapa wydarzeń, promocji i aktywności w Twojej okolicy. Spersonalizowane powiadomienia, promocje last-minute i prosty panel dla firm." />
-  <meta name="theme-color" content="#071026" />
-  <!-- Open Graph -->
-  <meta property="og:title" content="localevents.pl — Znajdź wydarzenia i promocje tu i teraz" />
-  <meta property="og:description" content="Mapa wydarzeń, promocji i aktywności w Twojej okolicy. Zapisz się do bety." />
-  <meta property="og:type" content="website" />
-  <meta property="og:image" content="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1200' height='630'%3E%3Crect width='100%25' height='100%25' fill='%23071126'/%3E%3Ctext x='48' y='320' fill='%23ff5a5f' font-family='Arial,sans-serif' font-size='72'%3Elocalevents.pl%3C/text%3E%3C/svg%3E" />
-  <!-- Simple SVG favicon -->
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect rx='6' width='32' height='32' fill='%23071126'/><circle cx='16' cy='12' r='6' fill='%23ff5a5f'/></svg>">
-  <!-- Leaflet CSS for interactive map -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <style>
-  /* Reset & Base */
-  :root{
-    --bg1:#071026;
-    --bg2:#0c1630;
-    --card:#071428;
-    --muted:#9aa4b2;
-    --accent:#ff5a5f;
-    --glass: rgba(255,255,255,0.03);
-    --container:1100px;
-    --radius:12px;
-    --focus: 0 0 0 4px rgba(255,90,95,0.12);
-  }
-  *{box-sizing:border-box}
-  html,body{height:100%}
-  body{
-    margin:0;
-    font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
-    background: radial-gradient(1200px 600px at 10% 10%, rgba(255,90,95,0.02), transparent 8%),
-                linear-gradient(180deg,var(--bg1),var(--bg2));
-    color:#e6eef8;
-    -webkit-font-smoothing:antialiased;
-    -moz-osx-font-smoothing:grayscale;
-    line-height:1.45;
-  }
-  .container{max-width:var(--container);margin:0 auto;padding:28px;position:relative;z-index:20}
-  /* panels overlay to improve readability over background map */
-  .panel{background:linear-gradient(180deg, rgba(7,20,38,0.72), rgba(7,20,38,0.64));border-radius:14px;padding:28px;border:1px solid rgba(255,255,255,0.04);backdrop-filter:blur(6px)}
-  .site-logo{height:34px;display:inline-block}
-  /* full-screen background map */
-  #bg-map{position:fixed;inset:0;width:100%;height:100%;z-index:0}
-  /* ensure main content sits above the map */
-  main, header, footer{position:relative;z-index:20}
-  .site-header .social-link{display:inline-flex;align-items:center;gap:8px;color:var(--muted);text-decoration:none}
-  .site-header .social-link svg{height:18px;width:18px;opacity:0.95}
-  header.site-header{position:sticky;top:0;background:linear-gradient(180deg, rgba(4,10,18,0.72), rgba(4,10,18,0.55));backdrop-filter:blur(8px);border-bottom:1px solid rgba(255,255,255,0.03);z-index:60}
-  .header-inner{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:10px 0}
-  .logo{display:flex;align-items:center;gap:10px;font-weight:700}
-  .logo svg{height:28px}
-  nav.nav a{color:#cbd5e1;text-decoration:none;margin-left:18px;font-size:14px}
-  nav.nav a:hover{color:var(--accent);transform:translateY(-1px)}
-  /* Hero */
-  .hero{padding:64px 0}
-  .hero-inner{display:flex;gap:36px;align-items:center}
-  .hero-text{flex:1;min-width:320px}
-  h1{font-size:40px;margin:0 0 12px;color:#fff;line-height:1.02;letter-spacing:-0.5px}
-  p.lead{font-size:18px}
-  p.lead{color:var(--muted);font-size:16px;margin:0 0 18px}
-  .cta-row{display:flex;gap:12px;margin-bottom:18px}
-  .btn{padding:12px 18px;border-radius:10px;text-decoration:none;font-weight:700;display:inline-flex;align-items:center;gap:8px}
-  .btn-primary{background:linear-gradient(90deg,var(--accent),#ff7b82);color:#fff;border:0;box-shadow:0 6px 24px rgba(255,90,95,0.12)}
-  .btn-ghost{background:transparent;border:1px solid rgba(255,255,255,0.06);color:#cbd5e1}
-  .lead-form{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:6px}
-  .lead-form input[type="email"]{padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,0.06);background:transparent;color:#e6eef8;min-width:220px}
-  .lead-form button{padding:12px 14px;border-radius:10px;border:0;background:var(--accent);color:white;font-weight:700}
-  .hero-mock{width:480px;height:auto;display:flex;justify-content:center;align-items:center}
-  /* Map container (Leaflet) */
-  #map{width:420px;height:560px;border-radius:18px;background:#061426;overflow:hidden;border:1px solid rgba(255,255,255,0.03);box-shadow:0 18px 44px rgba(2,6,23,0.6)}
-  .leaflet-container{border-radius:18px}
-  /* pulsing marker */
-  .pulse-marker{width:16px;height:16px;border-radius:50%;background:var(--accent);position:relative;box-shadow:0 6px 18px rgba(255,90,95,0.12)}
-  .pulse-marker::after{content:'';position:absolute;left:-10px;top:-10px;width:36px;height:36px;border-radius:50%;background:var(--accent);opacity:0.18;animation:pulse 2s infinite}
-  @keyframes pulse{0%{transform:scale(0.7);opacity:0.6}70%{transform:scale(1.6);opacity:0}100%{opacity:0}}
-  /* map mock */
-  .mock-map{width:320px;height:560px;border-radius:18px;background:linear-gradient(180deg,#061426,#07203a);position:relative;box-shadow: 0 18px 44px rgba(2,6,23,0.6);overflow:hidden;border:1px solid rgba(255,255,255,0.03)}
-  .mock-map .pin{position:absolute;transform:translate(-50%,-50%);font-size:32px;filter:drop-shadow(0 8px 24px rgba(0,0,0,0.6));animation:pin-bounce 3s infinite}
-  .pin.pin-1{left:50%;top:28%;color:var(--accent)}
-  .pin.pin-2{left:28%;top:60%;color:#ffd27f;font-size:22px;animation-delay:.3s}
-  .pin.pin-3{left:72%;top:72%;color:#6ee7b7;font-size:20px;animation-delay:.6s}
-  @keyframes pin-bounce{0%{transform:translate(-50%,-50%) scale(0.95)}50%{transform:translate(-50%,-64%) scale(1.05)}100%{transform:translate(-50%,-50%) scale(0.98)}}
-  /* Features */
-  .features{padding:36px 0}
-  .card{transition:transform .18s ease,box-shadow .18s ease}
-  .card:hover{transform:translateY(-6px);box-shadow:0 18px 50px rgba(2,6,23,0.6)}
-  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:18px}
-  .card{background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.00));padding:18px;border-radius:14px;border:1px solid rgba(255,255,255,0.03);backdrop-filter: blur(6px)}
-  .card h3{margin:0 0 8px}
-  /* For business */
-  .for-business{padding:36px 0;border-top:1px solid rgba(255,255,255,0.02);border-bottom:1px solid rgba(255,255,255,0.02)}
-  .benefits{list-style:none;padding:0;margin:12px 0 22px 0;color:var(--muted)}
-  .benefits li{margin:8px 0;padding-left:18px;position:relative}
-  .benefits li:before{content:'•';position:absolute;left:0;color:var(--accent)}
-  /* How it works */
-  .how{padding:36px 0}
-  .step{padding:18px;border-radius:12px}
-  .contact{padding:36px 0}
-  .contact-form{display:grid;grid-template-columns:1fr 1fr;gap:12px;max-width:880px}
-  .contact-form input,.contact-form textarea{padding:12px;border-radius:8px;border:1px solid rgba(255,255,255,0.06);background:transparent;color:#e6eef8}
-  .contact-form textarea{grid-column:1 / -1}
-  footer.site-footer{padding:18px 0;border-top:1px solid rgba(255,255,255,0.03);color:var(--muted)}
-  .footer-inner{display:flex;justify-content:space-between;align-items:center;gap:12px}
-  .socials a{color:var(--muted);margin-left:12px;text-decoration:none}
-  .small{font-size:12px;color:var(--muted)}
-  /* animations */
-  .reveal {opacity:0;transform:translateY(8px);transition:all .6s cubic-bezier(.2,.9,.32,1)}
-  .reveal.visible{opacity:1;transform:none}
-  /* responsive */
-  @media (max-width:980px){
-    .hero-inner{flex-direction:column-reverse}
-    .hero-mock{width:320px;height:420px}
-    #map{width:320px;height:420px}
-    .contact-form{grid-template-columns:1fr}
-  }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Local Events - Twoja lokalna wyszukiwarka AI</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        
+        /* Animacje mapy */
+        #map-hero { height: 100%; width: 100%; position: absolute; top: 0; left: 0; z-index: 0; filter: grayscale(0.3) opacity(0.6); }
+        
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        /* Animacja pulsujących markerów na mapie */
+        .pulse-icon {
+            background-color: #4F46E5;
+            border-radius: 50%;
+            box-shadow: 0 0 0 0 rgba(79, 70, 229, 1);
+            animation: pulse-blue 2s infinite;
+        }
+        @keyframes pulse-blue {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(79, 70, 229, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 15px rgba(79, 70, 229, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(79, 70, 229, 0); }
+        }
+
+        .gradient-text {
+            background: linear-gradient(90deg, #4F46E5 0%, #EC4899 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+    </style>
 </head>
-<body>
-  <div id="bg-map" aria-hidden="true"></div>
-  <header class="site-header">
-    <div class="container header-inner">
-      <div class="logo" aria-label="localevents.pl">
-        <!-- Use project logo (replace /assets/logo.svg with your provided file) -->
-        <img src="/assets/logo.svg" alt="localevents.pl logo" class="site-logo"/>
-      </div>
-      <nav class="nav" aria-label="Główne">
-        <a href="#features">Funkcje</a>
-        <a href="#for-business">Dla firm</a>
-        <a href="#contact">Kontakt</a>
-        <a class="social-link" href="https://instagram.com/localevents_official" target="_blank" rel="noopener" title="Instagram @localevents_official">
-          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M7 2h10a5 5 0 0 1 5 5v10a5 5 0 0 1-5 5H7a5 5 0 0 1-5-5V7a5 5 0 0 1 5-5z" stroke="#cbd5e1" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 11.37a4 4 0 1 1-2.63-3.75" stroke="#cbd5e1" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          <span style="font-size:13px;color:var(--muted);">@localevents_official</span>
-        </a>
-      </nav>
-    </div>
-  </header>
+<body class="bg-gray-50 text-gray-800">
 
-  <main>
-    <section class="hero panel" aria-labelledby="hero-heading">
-      <div class="container hero-inner">
-        <div class="hero-text">
-          <h1 id="hero-heading">Znajdź to, co dzieje się tu i teraz.</h1>
-          <p class="lead">Local Events to mapa wydarzeń, promocji i aktywności w Twojej okolicy — spersonalizowane powiadomienia, promocje last-minute i prosty panel dla firm.</p>
-          <div class="cta-row">
-            <a class="btn btn-primary" href="#signup">Zapisz się do bety</a>
-            <a class="btn btn-ghost" href="#features">Zobacz funkcje</a>
-          </div>
-
-          <!--
-            FORMULARZ ZAPISU:
-            Opcja A: Mailchimp - wklej action z Mailchimp w miejsce data-action="" i odkomentuj method/action
-            Opcja B: Netlify - odkomentuj data-netlify="true" i usuń action, Netlify automatycznie zbierze zgłoszenia
-          -->
-          <!-- MAILCHIMP: Wklej swój action (Mailchimp form action URL) do atrybutu action poniżej i odkomentuj method="post" -->
-          <!-- <form id="leadForm" action="https://XYZ...list-manage.com/subscribe/post?u=XXX&amp;id=YYY" method="post" class="lead-form"> -->
-          <form id="leadForm" class="lead-form" onsubmit="return false;">
-            <input id="email" type="email" name="EMAIL" placeholder="Twój e-mail" aria-label="Twój e-mail" required />
-            <button id="submitBtn" type="submit" class="btn-primary">Zapisz mnie</button>
-            <div class="small">Zapisz się, aby dostać informację o starcie i wersji beta. Szanujemy prywatność — nie spamujemy.</div>
-          </form>
+    <nav class="fixed w-full z-50 bg-white/90 backdrop-blur-md border-b border-gray-200 transition-all">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-20">
+                <div class="flex items-center gap-2 cursor-pointer">
+                    <div class="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold text-xl">L</div>
+                    <span class="font-bold text-2xl tracking-tight text-gray-900">Local<span class="text-indigo-600">Events</span></span>
+                </div>
+                <div class="hidden md:flex space-x-8 font-medium text-gray-600">
+                    <a href="#jak-to-dziala" class="hover:text-indigo-600 transition">Jak to działa</a>
+                    <a href="#funkcje" class="hover:text-indigo-600 transition">Funkcje</a>
+                    <a href="#cennik" class="hover:text-indigo-600 transition">Cennik</a>
+                    <a href="#kontakt" class="hover:text-indigo-600 transition">Kontakt</a>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <button class="text-gray-600 hover:text-indigo-600 font-medium">Zaloguj</button>
+                    <button class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-full font-medium transition shadow-lg shadow-indigo-200">
+                        Dodaj wydarzenie
+                    </button>
+                </div>
+            </div>
         </div>
+    </nav>
 
-        <div class="hero-mock" aria-hidden="true"></div>
-      </div>
+    <header class="relative h-screen flex items-center justify-center overflow-hidden">
+        <div id="map-hero"></div>
+        <div class="absolute inset-0 bg-gradient-to-b from-white/80 via-white/40 to-white z-10"></div>
+
+        <div class="relative z-20 text-center max-w-4xl px-4 mt-16">
+            <span class="inline-block py-1 px-3 rounded-full bg-indigo-100 text-indigo-700 text-sm font-bold mb-6 tracking-wide uppercase">
+                <i class="fa-solid fa-bolt mr-2"></i> Real-time Local AI Search
+            </span>
+            <h1 class="text-5xl md:text-6xl font-extrabold text-gray-900 leading-tight mb-6">
+                Odkrywaj wydarzenia i promocje w <br class="hidden md:block" />
+                <span class="gradient-text">Twojej okolicy</span> — w czasie rzeczywistym
+            </h1>
+            <p class="text-xl text-gray-600 mb-10 max-w-2xl mx-auto">
+                Platforma AI, która pokazuje Ci gdzie warto być, a firmom pomaga dotrzeć do klientów bez reklam. Bez aplikacji, prosto w przeglądarce.
+            </p>
+            
+            <div class="bg-white p-2 rounded-full shadow-2xl max-w-2xl mx-auto flex flex-col md:flex-row items-center gap-2 border border-gray-200 transform hover:scale-[1.01] transition duration-300">
+                <div class="flex-1 flex items-center px-6 py-3 w-full">
+                    <i class="fa-solid fa-location-dot text-indigo-500 text-xl mr-4"></i>
+                    <input type="text" placeholder="Warszawa, Śródmieście..." class="w-full outline-none text-lg text-gray-700 placeholder-gray-400 bg-transparent">
+                </div>
+                <div class="h-8 w-px bg-gray-200 hidden md:block"></div>
+                <div class="flex-1 flex items-center px-6 py-3 w-full">
+                    <i class="fa-regular fa-calendar text-indigo-500 text-xl mr-4"></i>
+                    <select class="w-full outline-none text-lg text-gray-700 bg-transparent cursor-pointer">
+                        <option>Dzisiaj</option>
+                        <option>Jutro</option>
+                        <option>W ten weekend</option>
+                    </select>
+                </div>
+                <button class="bg-indigo-600 hover:bg-indigo-700 text-white w-full md:w-auto rounded-full px-8 py-4 font-bold text-lg shadow-md transition flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-search"></i> Szukaj
+                </button>
+            </div>
+
+            <div class="mt-8 flex flex-col sm:flex-row justify-center gap-4 text-sm font-medium text-gray-500">
+                <span class="flex items-center"><i class="fa-solid fa-check text-green-500 mr-2"></i> Bez instalowania aplikacji</span>
+                <span class="flex items-center"><i class="fa-solid fa-check text-green-500 mr-2"></i> Precyzyjna lokalizacja</span>
+                <span class="flex items-center"><i class="fa-solid fa-check text-green-500 mr-2"></i> Powiadomienia AI</span>
+            </div>
+        </div>
+    </header>
+
+    <section id="jak-to-dziala" class="py-20 bg-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16">
+                <h2 class="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Jak działa Local Events?</h2>
+                <p class="text-lg text-gray-600">Prosty proces dla użytkowników i potężne narzędzie dla firm.</p>
+                
+                <div class="mt-8 inline-flex bg-gray-100 p-1 rounded-lg">
+                    <button onclick="toggleHow('user')" id="btn-user" class="px-6 py-2 rounded-md text-sm font-semibold shadow-sm bg-white text-gray-900 transition-all">Dla Użytkownika</button>
+                    <button onclick="toggleHow('business')" id="btn-business" class="px-6 py-2 rounded-md text-sm font-semibold text-gray-500 hover:text-gray-900 transition-all">Dla Firmy</button>
+                </div>
+            </div>
+
+            <div id="content-user" class="grid md:grid-cols-3 gap-10 text-center transition-all duration-500">
+                <div class="p-6">
+                    <div class="w-20 h-20 bg-indigo-50 rounded-2xl flex items-center justify-center mx-auto mb-6 text-indigo-600 text-3xl">
+                        <i class="fa-solid fa-location-crosshairs"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-3">1. Włączasz lokalizację</h3>
+                    <p class="text-gray-600">Wystarczy wejść na stronę. Bez logowania i pobierania apek. System AI rozpoznaje, gdzie jesteś.</p>
+                </div>
+                <div class="p-6">
+                    <div class="w-20 h-20 bg-indigo-50 rounded-2xl flex items-center justify-center mx-auto mb-6 text-indigo-600 text-3xl">
+                        <i class="fa-solid fa-map"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-3">2. Odkrywasz "Tu i Teraz"</h3>
+                    <p class="text-gray-600">Widzisz mapę wydarzeń, promocji last-minute i atrakcji, które dzieją się w tej chwili wokół Ciebie.</p>
+                </div>
+                <div class="p-6">
+                    <div class="w-20 h-20 bg-indigo-50 rounded-2xl flex items-center justify-center mx-auto mb-6 text-indigo-600 text-3xl">
+                        <i class="fa-solid fa-bell"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-3">3. Inteligentne powiadomienia</h3>
+                    <p class="text-gray-600">AI uczy się, co lubisz. Dostajesz tylko te propozycje, które pasują do Twojego stylu życia.</p>
+                </div>
+            </div>
+
+            <div id="content-business" class="hidden grid md:grid-cols-3 gap-10 text-center transition-all duration-500">
+                <div class="p-6">
+                    <div class="w-20 h-20 bg-green-50 rounded-2xl flex items-center justify-center mx-auto mb-6 text-green-600 text-3xl">
+                        <i class="fa-solid fa-plus"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-3">1. Dodajesz promocję</h3>
+                    <p class="text-gray-600">Masz wolny stolik? Organizujesz karaoke? Wrzucasz info w 30 sekund przez prosty panel.</p>
+                </div>
+                <div class="p-6">
+                    <div class="w-20 h-20 bg-green-50 rounded-2xl flex items-center justify-center mx-auto mb-6 text-green-600 text-3xl">
+                        <i class="fa-solid fa-bullseye"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-3">2. Ustalasz zasięg</h3>
+                    <p class="text-gray-600">Decydujesz, kto ma to zobaczyć. Turyści w promieniu 1km? A może mieszkańcy całego miasta?</p>
+                </div>
+                <div class="p-6">
+                    <div class="w-20 h-20 bg-green-50 rounded-2xl flex items-center justify-center mx-auto mb-6 text-green-600 text-3xl">
+                        <i class="fa-solid fa-users-viewfinder"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-3">3. Trafiasz do klientów</h3>
+                    <p class="text-gray-600">Klienci szukający atrakcji widzą Twoją ofertę dokładnie wtedy, gdy podejmują decyzję.</p>
+                </div>
+            </div>
+        </div>
     </section>
 
-    <!-- Globe section: interactive rotatable globe with event pins -->
-    <section id="globe-section" class="container panel" aria-labelledby="globe-heading">
-      <h2 id="globe-heading">Mapa świata — obracaj i odkrywaj</h2>
-      <p class="small">Obróć kulę, najedź na pinezkę aby usłyszeć dźwięk i zobaczyć wiadomość.</p>
-      <div id="globe" style="height:520px; width:100%; max-width:1100px; margin:18px auto 6px; border-radius:12px; overflow:hidden;"></div>
-      <div id="globe-tooltip" style="position:absolute;pointer-events:none;padding:8px 12px;background:rgba(2,6,23,0.88);color:#fff;border-radius:8px;border:1px solid rgba(255,255,255,0.04);display:none;z-index:40;font-size:14px">Dobrego dnia :D</div>
+    <section id="funkcje" class="py-20 bg-gray-50 border-t border-gray-200">
+        <div class="max-w-7xl mx-auto px-4">
+            <div class="text-center mb-16">
+                <h2 class="text-3xl font-bold text-gray-900">Co nas wyróżnia?</h2>
+                <p class="text-gray-600 mt-2">To nie jest kolejny katalog firm. To żywy ekosystem.</p>
+            </div>
+            
+            <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <div class="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 hover:shadow-lg transition">
+                    <div class="text-indigo-500 text-2xl mb-4"><i class="fa-solid fa-bolt"></i></div>
+                    <h4 class="text-lg font-bold mb-2">Real-Time Data</h4>
+                    <p class="text-gray-600 text-sm">Informacje są zawsze aktualne. Koniec z wydarzeniami, które odbyły się tydzień temu.</p>
+                </div>
+                <div class="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 hover:shadow-lg transition">
+                    <div class="text-indigo-500 text-2xl mb-4"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
+                    <h4 class="text-lg font-bold mb-2">AI Recommendations</h4>
+                    <p class="text-gray-600 text-sm">Algorytm uczy się Twoich preferencji i nie spamuje Cię koncertami jazzowymi, jeśli wolisz rock.</p>
+                </div>
+                <div class="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 hover:shadow-lg transition">
+                    <div class="text-indigo-500 text-2xl mb-4"><i class="fa-solid fa-hourglass-end"></i></div>
+                    <h4 class="text-lg font-bold mb-2">Promocje Last-Minute</h4>
+                    <p class="text-gray-600 text-sm">Restauracje mogą wrzucać promocje "Happy Hour" ważne tylko przez 2 godziny.</p>
+                </div>
+                <div class="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 hover:shadow-lg transition">
+                    <div class="text-indigo-500 text-2xl mb-4"><i class="fa-solid fa-globe"></i></div>
+                    <h4 class="text-lg font-bold mb-2">Bez Aplikacji</h4>
+                    <p class="text-gray-600 text-sm">Działamy w przeglądarce. Szybko, lekko i na każdym urządzeniu.</p>
+                </div>
+                <div class="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 hover:shadow-lg transition">
+                    <div class="text-indigo-500 text-2xl mb-4"><i class="fa-solid fa-chart-line"></i></div>
+                    <h4 class="text-lg font-bold mb-2">Panel Analityczny</h4>
+                    <p class="text-gray-600 text-sm">Firmy widzą dokładnie ile osób zobaczyło ich wydarzenie i kliknęło "nawiguj".</p>
+                </div>
+                <div class="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 hover:shadow-lg transition">
+                    <div class="text-indigo-500 text-2xl mb-4"><i class="fa-solid fa-city"></i></div>
+                    <h4 class="text-lg font-bold mb-2">API dla Miast</h4>
+                    <p class="text-gray-600 text-sm">Możliwość integracji z systemami miejskimi i promocją turystyki regionu.</p>
+                </div>
+            </div>
+        </div>
     </section>
 
-    <section id="features" class="features container panel" aria-labelledby="features-heading">
-      <h2 id="features-heading">Co oferujemy</h2>
-      <div class="grid">
-        <div class="card reveal">
-          <h3>Mapa wydarzeń</h3>
-          <p>Wszystko w jednym miejscu — wydarzenia, promocje, warsztaty i lokalne atrakcje.</p>
+    <section class="py-20 bg-white">
+        <div class="max-w-7xl mx-auto px-4">
+            <h2 class="text-3xl font-bold text-center mb-12">Local Events łączy wszystkich</h2>
+            <div class="grid md:grid-cols-3 gap-6">
+                
+                <div class="group relative overflow-hidden rounded-2xl aspect-[4/5] cursor-pointer">
+                    <img src="https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&w=600&q=80" class="object-cover w-full h-full group-hover:scale-110 transition duration-500">
+                    <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
+                    <div class="absolute bottom-0 p-6 text-white">
+                        <h3 class="text-2xl font-bold">Dla Użytkowników</h3>
+                        <p class="text-gray-200 text-sm mt-2 opacity-0 group-hover:opacity-100 transition">Spontaniczne wypady, turyści, rodziny szukające atrakcji.</p>
+                    </div>
+                </div>
+
+                <div class="group relative overflow-hidden rounded-2xl aspect-[4/5] cursor-pointer">
+                    <img src="https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=600&q=80" class="object-cover w-full h-full group-hover:scale-110 transition duration-500">
+                    <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
+                    <div class="absolute bottom-0 p-6 text-white">
+                        <h3 class="text-2xl font-bold">Dla Biznesu</h3>
+                        <p class="text-gray-200 text-sm mt-2 opacity-0 group-hover:opacity-100 transition">Restauracje, kluby, siłownie, organizatorzy eventów.</p>
+                    </div>
+                </div>
+
+                <div class="group relative overflow-hidden rounded-2xl aspect-[4/5] cursor-pointer">
+                    <img src="https://images.unsplash.com/photo-1541339907198-e08756dedf3f?auto=format&fit=crop&w=600&q=80" class="object-cover w-full h-full group-hover:scale-110 transition duration-500">
+                    <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
+                    <div class="absolute bottom-0 p-6 text-white">
+                        <h3 class="text-2xl font-bold">Dla Instytucji</h3>
+                        <p class="text-gray-200 text-sm mt-2 opacity-0 group-hover:opacity-100 transition">Miasta, domy kultury, uczelnie, centra handlowe.</p>
+                    </div>
+                </div>
+            </div>
         </div>
-        <div class="card reveal">
-          <h3>Powiadomienia w czasie rzeczywistym</h3>
-          <p>Otrzymuj powiadomienia o promocjach i eventach w Twoim zasięgu, kiedy warto działać.</p>
-        </div>
-        <div class="card reveal">
-          <h3>Panel dla firm</h3>
-          <p>Proste narzędzie do wystawiania promocji, ustawiania zasięgu oraz mierzenia efektów.</p>
-        </div>
-        <div class="card reveal">
-          <h3>Rekomendacje</h3>
-          <p>Spersonalizowane sugestie oparte na Twoich preferencjach i aktywności.</p>
-        </div>
-      </div>
     </section>
 
-    <section id="for-business" class="for-business container panel" aria-labelledby="business-heading">
-      <h2 id="business-heading">Dlaczego warto jako firma?</h2>
-      <ul class="benefits">
-        <li>Szybkie wypełnianie wolnych terminów</li>
-        <li>Targetowanie geograficzne i kontrola budżetu</li>
-        <li>Mierzalna analityka: wyświetlenia → kliknięcia → konwersje</li>
-        <li>Niskie koszty dotarcia w porównaniu do tradycyjnych kampanii</li>
-      </ul>
-      <a class="btn btn-primary" href="#contact">Porozmawiaj z nami</a>
+    <section class="py-20 bg-indigo-900 text-white overflow-hidden relative">
+        <div class="absolute top-0 left-0 w-full h-full overflow-hidden z-0 opacity-20">
+            <div class="absolute top-[-10%] left-[-10%] w-96 h-96 bg-purple-500 rounded-full blur-3xl"></div>
+            <div class="absolute bottom-[-10%] right-[-10%] w-96 h-96 bg-blue-500 rounded-full blur-3xl"></div>
+        </div>
+
+        <div class="max-w-7xl mx-auto px-4 relative z-10 grid lg:grid-cols-2 gap-12 items-center">
+            <div>
+                <h2 class="text-4xl font-bold mb-6">Zarządzaj miastem z jednego miejsca</h2>
+                <p class="text-indigo-200 text-lg mb-8">Najprostszy panel do promocji lokalnej aktywności. Dodaj wydarzenie, ustaw zasięg i obserwuj jak rośnie zainteresowanie w czasie rzeczywistym.</p>
+                <ul class="space-y-4 mb-8">
+                    <li class="flex items-center"><i class="fa-solid fa-circle-check text-green-400 mr-3"></i> Intuicyjny kreator eventów</li>
+                    <li class="flex items-center"><i class="fa-solid fa-circle-check text-green-400 mr-3"></i> Statystyki zasięgu live</li>
+                    <li class="flex items-center"><i class="fa-solid fa-circle-check text-green-400 mr-3"></i> Zarządzanie wieloma lokalizacjami</li>
+                </ul>
+                <button class="bg-white text-indigo-900 px-8 py-3 rounded-full font-bold hover:bg-gray-100 transition">Zobacz Demo Panelu</button>
+            </div>
+
+            <div class="bg-gray-900 rounded-xl shadow-2xl border border-gray-700 p-2 transform rotate-1 hover:rotate-0 transition duration-500">
+                <div class="bg-gray-800 rounded-lg overflow-hidden flex h-80">
+                    <div class="w-16 bg-gray-900 border-r border-gray-700 flex flex-col items-center py-4 space-y-6">
+                        <div class="w-8 h-8 bg-indigo-500 rounded-md"></div>
+                        <div class="w-6 h-6 bg-gray-700 rounded-sm"></div>
+                        <div class="w-6 h-6 bg-gray-700 rounded-sm"></div>
+                        <div class="w-6 h-6 bg-gray-700 rounded-sm"></div>
+                    </div>
+                    <div class="flex-1 p-6">
+                        <div class="flex justify-between items-center mb-6">
+                            <div class="h-4 w-32 bg-gray-700 rounded"></div>
+                            <div class="h-8 w-24 bg-indigo-600 rounded-md"></div>
+                        </div>
+                        <div class="grid grid-cols-3 gap-4 mb-6">
+                            <div class="bg-gray-700 h-24 rounded-lg p-3">
+                                <div class="text-xs text-gray-400">Wyświetlenia</div>
+                                <div class="text-xl font-bold mt-1">12,450</div>
+                                <div class="h-1 w-full bg-gray-600 mt-8 rounded overflow-hidden"><div class="h-full w-[70%] bg-green-400"></div></div>
+                            </div>
+                            <div class="bg-gray-700 h-24 rounded-lg p-3">
+                                <div class="text-xs text-gray-400">Kliknięcia</div>
+                                <div class="text-xl font-bold mt-1">856</div>
+                                <div class="h-1 w-full bg-gray-600 mt-8 rounded overflow-hidden"><div class="h-full w-[40%] bg-blue-400"></div></div>
+                            </div>
+                            <div class="bg-gray-700 h-24 rounded-lg p-3">
+                                <div class="text-xs text-gray-400">Konwersja</div>
+                                <div class="text-xl font-bold mt-1">6.8%</div>
+                                <div class="h-1 w-full bg-gray-600 mt-8 rounded overflow-hidden"><div class="h-full w-[60%] bg-purple-400"></div></div>
+                            </div>
+                        </div>
+                        <div class="bg-gray-700 h-32 rounded-lg w-full flex items-end p-4 gap-2">
+                            <div class="w-full bg-indigo-500/30 h-[40%] rounded-t-sm"></div>
+                            <div class="w-full bg-indigo-500/50 h-[60%] rounded-t-sm"></div>
+                            <div class="w-full bg-indigo-500/80 h-[80%] rounded-t-sm"></div>
+                            <div class="w-full bg-indigo-500 h-[50%] rounded-t-sm"></div>
+                            <div class="w-full bg-indigo-500 h-[90%] rounded-t-sm"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </section>
 
-    <section id="how" class="how container panel" aria-labelledby="how-heading">
-      <h2 id="how-heading">Jak to działa</h2>
-      <div class="grid">
-        <div class="step card reveal">
-          <h4>1. Odkryj</h4>
-          <p>Otwórz mapę, wybierz kategorie i znajdź wydarzenia blisko siebie.</p>
+    <section id="cennik" class="py-20 bg-white">
+        <div class="max-w-7xl mx-auto px-4">
+            <div class="text-center mb-16">
+                <h2 class="text-3xl font-bold text-gray-900">Przejrzysty cennik dla firm</h2>
+                <p class="text-gray-600">Rozpocznij za darmo, płać dopiero gdy potrzebujesz większego zasięgu.</p>
+            </div>
+
+            <div class="grid md:grid-cols-4 gap-6 max-w-6xl mx-auto">
+                <div class="border border-gray-200 rounded-2xl p-6 hover:shadow-xl transition flex flex-col">
+                    <h3 class="text-xl font-bold text-gray-900">Start</h3>
+                    <div class="my-4"><span class="text-4xl font-bold">0 zł</span></div>
+                    <p class="text-sm text-gray-500 mb-6">Dla małych lokalnych biznesów na start.</p>
+                    <ul class="text-sm space-y-3 mb-8 flex-1">
+                        <li class="flex"><i class="fa-solid fa-check text-green-500 mr-2 mt-1"></i> Dodawanie wydarzeń</li>
+                        <li class="flex"><i class="fa-solid fa-check text-green-500 mr-2 mt-1"></i> Podstawowy zasięg</li>
+                        <li class="flex"><i class="fa-solid fa-check text-green-500 mr-2 mt-1"></i> Profil firmy</li>
+                    </ul>
+                    <button class="w-full py-2 border border-indigo-600 text-indigo-600 rounded-lg font-semibold hover:bg-indigo-50">Wybieram</button>
+                </div>
+
+                <div class="border-2 border-indigo-600 rounded-2xl p-6 shadow-lg relative flex flex-col transform scale-105 bg-white">
+                    <div class="absolute top-0 right-0 bg-indigo-600 text-white text-xs font-bold px-3 py-1 rounded-bl-lg rounded-tr-lg">POLECANY</div>
+                    <h3 class="text-xl font-bold text-gray-900">Pro</h3>
+                    <div class="my-4"><span class="text-4xl font-bold">49 zł</span><span class="text-gray-500 text-sm"> /msc</span></div>
+                    <p class="text-sm text-gray-500 mb-6">Dla aktywnych promotorów.</p>
+                    <ul class="text-sm space-y-3 mb-8 flex-1">
+                        <li class="flex"><i class="fa-solid fa-check text-green-500 mr-2 mt-1"></i> Wyróżnienie w wynikach</li>
+                        <li class="flex"><i class="fa-solid fa-check text-green-500 mr-2 mt-1"></i> Promocje last-minute</li>
+                        <li class="flex"><i class="fa-solid fa-check text-green-500 mr-2 mt-1"></i> 2x większy zasięg</li>
+                    </ul>
+                    <button class="w-full py-2 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700">Wybieram</button>
+                </div>
+
+                <div class="border border-gray-200 rounded-2xl p-6 hover:shadow-xl transition flex flex-col">
+                    <h3 class="text-xl font-bold text-gray-900">Premium</h3>
+                    <div class="my-4"><span class="text-4xl font-bold">199 zł</span><span class="text-gray-500 text-sm"> /msc</span></div>
+                    <p class="text-sm text-gray-500 mb-6">Dla klubów i organizatorów.</p>
+                    <ul class="text-sm space-y-3 mb-8 flex-1">
+                        <li class="flex"><i class="fa-solid fa-check text-green-500 mr-2 mt-1"></i> Top lokalny (1. miejsce)</li>
+                        <li class="flex"><i class="fa-solid fa-check text-green-500 mr-2 mt-1"></i> Pełne statystyki</li>
+                        <li class="flex"><i class="fa-solid fa-check text-green-500 mr-2 mt-1"></i> Priorytet w AI</li>
+                    </ul>
+                    <button class="w-full py-2 border border-indigo-600 text-indigo-600 rounded-lg font-semibold hover:bg-indigo-50">Wybieram</button>
+                </div>
+
+                <div class="border border-gray-200 rounded-2xl p-6 hover:shadow-xl transition flex flex-col bg-gray-50">
+                    <h3 class="text-xl font-bold text-gray-900">Enterprise</h3>
+                    <div class="my-4"><span class="text-2xl font-bold">Indywidualna</span></div>
+                    <p class="text-sm text-gray-500 mb-6">Dla miast i dużych sieci.</p>
+                    <ul class="text-sm space-y-3 mb-8 flex-1">
+                        <li class="flex"><i class="fa-solid fa-check text-gray-500 mr-2 mt-1"></i> Dedykowane API</li>
+                        <li class="flex"><i class="fa-solid fa-check text-gray-500 mr-2 mt-1"></i> Raporty danych miejskich</li>
+                        <li class="flex"><i class="fa-solid fa-check text-gray-500 mr-2 mt-1"></i> Wsparcie 24/7</li>
+                    </ul>
+                    <button class="w-full py-2 border border-gray-400 text-gray-600 rounded-lg font-semibold hover:bg-gray-200">Kontakt</button>
+                </div>
+            </div>
         </div>
-        <div class="step card reveal">
-          <h4>2. Otrzymaj powiadomienia</h4>
-          <p>Dostawaj real-time alerty o promocjach i eventach w Twoim zasięgu.</p>
-        </div>
-        <div class="step card reveal">
-          <h4>3. Wykorzystaj ofertę</h4>
-          <p>Rezerwuj, kupuj bilety lub po prostu idź — wszystko szybko i lokalnie.</p>
-        </div>
-      </div>
     </section>
 
-    <section id="contact" class="contact container panel" aria-labelledby="contact-heading">
-      <h2 id="contact-heading">Kontakt</h2>
-      <p>Chcesz testować jako firma lub zostać partnerem? Napisz do nas.</p>
-      <!-- Contact form - standard POST (replace action with your backend) -->
-      <form class="contact-form" id="contactForm" onsubmit="return false;">
-        <input type="text" id="contactName" name="name" placeholder="Imię i nazwisko" required />
-        <input type="email" id="contactEmail" name="email" placeholder="E-mail" required />
-        <textarea id="contactMessage" name="message" placeholder="Wiadomość" rows="6"></textarea>
-        <button class="btn btn-primary" type="submit">Wyślij</button>
-      </form>
+    <section class="py-20 bg-gray-50">
+        <div class="max-w-3xl mx-auto px-4">
+            <h2 class="text-3xl font-bold text-center mb-10">Częste pytania (FAQ)</h2>
+            
+            <div class="space-y-4">
+                <details class="bg-white p-6 rounded-xl shadow-sm cursor-pointer">
+                    <summary class="font-semibold text-lg flex justify-between items-center">Czy muszę instalować aplikację? <i class="fa-solid fa-chevron-down text-gray-400"></i></summary>
+                    <p class="mt-4 text-gray-600">Nie! Local Events działa jako nowoczesna aplikacja webowa (PWA). Dostępna bezpośrednio z przeglądarki w Twoim telefonie, bez zajmowania pamięci.</p>
+                </details>
+                <details class="bg-white p-6 rounded-xl shadow-sm cursor-pointer">
+                    <summary class="font-semibold text-lg flex justify-between items-center">Jak działa AI w wyszukiwarce? <i class="fa-solid fa-chevron-down text-gray-400"></i></summary>
+                    <p class="mt-4 text-gray-600">Nasze AI analizuje Twoją lokalizację, porę dnia, pogodę oraz Twoje przeszłe wybory, aby podpowiedzieć Ci najbardziej pasujące wydarzenia (np. "Kawa w przytulnym miejscu" w deszczowy dzień).</p>
+                </details>
+                <details class="bg-white p-6 rounded-xl shadow-sm cursor-pointer">
+                    <summary class="font-semibold text-lg flex justify-between items-center">Czy dodanie wydarzenia jest darmowe? <i class="fa-solid fa-chevron-down text-gray-400"></i></summary>
+                    <p class="mt-4 text-gray-600">Tak, pakiet "Start" pozwala na bezpłatne dodawanie wydarzeń i promocji z podstawowym zasięgiem lokalnym.</p>
+                </details>
+            </div>
+        </div>
     </section>
-  </main>
 
-  <footer class="site-footer">
-    <div class="container footer-inner">
-      <div>© localevents.pl • Wszystkie prawa zastrzeżone</div>
-      <div class="socials">
-        <a href="https://instagram.com/localevents_official" target="_blank" rel="noopener">
-          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style="height:16px;vertical-align:middle;margin-right:6px"><path d="M7 2h10a5 5 0 0 1 5 5v10a5 5 0 0 1-5 5H7a5 5 0 0 1-5-5V7a5 5 0 0 1 5-5z" stroke="#cbd5e1" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 11.37a4 4 0 1 1-2.63-3.75" stroke="#cbd5e1" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          Instagram
-        </a>
-        <a href="#" target="_blank" rel="noopener">Facebook</a>
-      </div>
-    </div>
-  </footer>
+    <footer id="kontakt" class="bg-gray-900 text-white pt-20 pb-10">
+        <div class="max-w-7xl mx-auto px-4 grid md:grid-cols-2 lg:grid-cols-4 gap-12 mb-16">
+            <div>
+                <div class="flex items-center gap-2 mb-6">
+                    <div class="w-8 h-8 bg-indigo-600 rounded text-center flex items-center justify-center font-bold">L</div>
+                    <span class="text-xl font-bold">Local Events</span>
+                </div>
+                <p class="text-gray-400 text-sm mb-6">Łączymy ludzi z miejscami. Szybko, precyzyjnie i lokalnie.</p>
+                <div class="flex space-x-4">
+                    <a href="#" class="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center hover:bg-indigo-600 transition"><i class="fa-brands fa-facebook-f"></i></a>
+                    <a href="#" class="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center hover:bg-indigo-600 transition"><i class="fa-brands fa-instagram"></i></a>
+                    <a href="#" class="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center hover:bg-indigo-600 transition"><i class="fa-brands fa-linkedin-in"></i></a>
+                </div>
+            </div>
+            
+            <div>
+                <h4 class="font-bold mb-4">Dla Firm</h4>
+                <ul class="space-y-2 text-gray-400 text-sm">
+                    <li><a href="#" class="hover:text-white">Zaloguj się</a></li>
+                    <li><a href="#" class="hover:text-white">Dodaj wydarzenie</a></li>
+                    <li><a href="#" class="hover:text-white">Cennik</a></li>
+                    <li><a href="#" class="hover:text-white">API Dokumentacja</a></li>
+                </ul>
+            </div>
 
-  <script>
-  // Load Leaflet JS dynamically and initialize a full-screen animated background map
-  (function(){
-    const s=document.createElement('script');
-    s.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-    s.defer=true;document.head.appendChild(s);
-    s.onload=function(){
-      const center = [52.2297,21.0122];
-      const map = L.map('bg-map',{
-        center:center,
-        zoom:13,
-        zoomControl:false,
-        attributionControl:false,
-        keyboard:false,
-        scrollWheelZoom:false,
-        doubleClickZoom:false,
-        dragging:false
-      }).setView(center,13);
+            <div>
+                <h4 class="font-bold mb-4">O nas</h4>
+                <ul class="space-y-2 text-gray-400 text-sm">
+                    <li><a href="#" class="hover:text-white">Jak to działa</a></li>
+                    <li><a href="#" class="hover:text-white">Kariera</a></li>
+                    <li><a href="#" class="hover:text-white">Blog</a></li>
+                    <li><a href="#" class="hover:text-white">Kontakt</a></li>
+                </ul>
+            </div>
 
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:''}).addTo(map);
+            <div>
+                <h4 class="font-bold mb-4">Napisz do nas</h4>
+                <form class="space-y-3">
+                    <input type="email" placeholder="Twój email" class="w-full bg-gray-800 border border-gray-700 rounded p-2 text-sm text-white outline-none focus:border-indigo-500">
+                    <textarea placeholder="Wiadomość" rows="2" class="w-full bg-gray-800 border border-gray-700 rounded p-2 text-sm text-white outline-none focus:border-indigo-500"></textarea>
+                    <button class="bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded text-sm font-bold w-full">Wyślij</button>
+                </form>
+            </div>
+        </div>
+        
+        <div class="border-t border-gray-800 pt-8 text-center text-gray-500 text-sm">
+            <p>&copy; 2024 Local Events. Wszelkie prawa zastrzeżone. <a href="#" class="hover:text-white ml-2">Polityka Prywatności</a> | <a href="#" class="hover:text-white ml-2">Regulamin</a></p>
+        </div>
+    </footer>
 
-      // sample events
-      const events = [
-        {lat:52.231, lng:21.011, title:'Koncert jazzowy', desc:'Klub muzyczny — bilety od 40 zł'},
-        {lat:52.226, lng:21.015, title:'Targi lokalne', desc:'Stoiska, jedzenie, rękodzieło'},
-        {lat:52.235, lng:21.005, title:'Warsztaty fotograficzne', desc:'Bezpłatne miejsce — zapisy online'}
-      ];
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // 1. Inicjalizacja Mapy (Warszawa jako default)
+        const map = L.map('map-hero', {
+            zoomControl: false,
+            scrollWheelZoom: false,
+            dragging: false,
+            attributionControl: false
+        }).setView([52.2297, 21.0122], 14);
 
-      const markers = [];
-      events.forEach((e,i)=>{
-        const icon = L.divIcon({className:'', html:'<div class="pulse-marker" aria-hidden="true"></div>',iconSize:[36,36],iconAnchor:[18,18]});
-        const m = L.marker([e.lat,e.lng],{icon,interactive:true}).addTo(map);
-        m.bindPopup(`<strong>${e.title}</strong><div style=\"margin-top:6px;color:var(--muted)\">${e.desc}</div>`);
-        markers.push({marker:m,base:[e.lat,e.lng]});
-      });
+        // Tile Layer (OpenStreetMap - CartoDB Positron for clean look)
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+            maxZoom: 19
+        }).addTo(map);
 
-      // subtle drifting animation for the map center and jitter for markers
-      let t = 0;
-      function animate(){
-        t += 0.003;
-        const offsetLat = Math.sin(t)*0.0009;
-        const offsetLng = Math.cos(t*0.9)*0.0009;
-        map.setView([center[0]+offsetLat, center[1]+offsetLng], map.getZoom(), {animate:true, duration:4});
+        // 2. Generowanie losowych markerów (Symulacja eventów)
+        const events = [
+            { lat: 52.2300, lng: 21.0100, title: "Jazz Live" },
+            { lat: 52.2320, lng: 21.0150, title: "Happy Hour -50%" },
+            { lat: 52.2280, lng: 21.0200, title: "Wernisaż Sztuki" },
+            { lat: 52.2250, lng: 21.0050, title: "Trening Yoga" },
+            { lat: 52.2350, lng: 21.0250, title: "Stand-up Comedy" }
+        ];
 
-        markers.forEach((o,idx)=>{
-          const jitterLat = Math.sin(t*(1+idx*0.4)+idx)*0.0006;
-          const jitterLng = Math.cos(t*(1.1+idx*0.3)+idx)*0.0006;
-          o.marker.setLatLng([o.base[0]+jitterLat, o.base[1]+jitterLng]);
+        // Ikona markera
+        const customIcon = L.divIcon({
+            className: 'pulse-icon',
+            iconSize: [12, 12]
         });
 
-        requestAnimationFrame(animate);
-      }
-      requestAnimationFrame(animate);
+        events.forEach(event => {
+            L.marker([event.lat, event.lng], { icon: customIcon }).addTo(map);
+        });
 
-      // style map canvas slightly dimmed so UI text reads well
-      map.getContainer().style.filter = 'brightness(0.86) contrast(0.96)';
-    };
-  })();
+        // 3. Logika przełącznika "Jak to działa"
+        function toggleHow(type) {
+            const btnUser = document.getElementById('btn-user');
+            const btnBusiness = document.getElementById('btn-business');
+            const contentUser = document.getElementById('content-user');
+            const contentBusiness = document.getElementById('content-business');
 
-  // Simple progressive reveal on scroll
-  (function(){
-    const reveals = document.querySelectorAll('.reveal');
-    const io = new IntersectionObserver((entries) => {
-      entries.forEach(e => {
-        if(e.isIntersecting) e.target.classList.add('visible');
-      });
-    }, {threshold: 0.12});
-    reveals.forEach(r => io.observe(r));
-  })();
+            if (type === 'user') {
+                // Style przycisków
+                btnUser.classList.add('bg-white', 'text-gray-900', 'shadow-sm');
+                btnUser.classList.remove('text-gray-500', 'hover:text-gray-900');
+                btnBusiness.classList.remove('bg-white', 'text-gray-900', 'shadow-sm');
+                btnBusiness.classList.add('text-gray-500', 'hover:text-gray-900');
+                
+                // Treść
+                contentUser.classList.remove('hidden');
+                contentBusiness.classList.add('hidden');
+            } else {
+                // Style przycisków
+                btnBusiness.classList.add('bg-white', 'text-gray-900', 'shadow-sm');
+                btnBusiness.classList.remove('text-gray-500', 'hover:text-gray-900');
+                btnUser.classList.remove('bg-white', 'text-gray-900', 'shadow-sm');
+                btnUser.classList.add('text-gray-500', 'hover:text-gray-900');
 
-  // Lead capture behavior (client-side)
-  (function(){
-    const leadForm = document.getElementById('leadForm');
-    const emailInput = document.getElementById('email');
-    const submitBtn = document.getElementById('submitBtn');
-
-    leadForm.addEventListener('submit', function(evt){
-      evt.preventDefault();
-      const email = emailInput.value && emailInput.value.trim();
-      if(!email || !/^\S+@\S+\.\S+$/.test(email)) {
-        alert('Wpisz poprawny e-mail');
-        emailInput.focus();
-        return;
-      }
-
-      // If you use Mailchimp: the form action should post directly to Mailchimp (uncomment in HTML)
-      // If you use Netlify: add data-netlify="true" to <form> and remove this JS handler
-      // For now we simulate a success and store locally in localStorage for simple tracking
-
-      try {
-        // fake "send" - store in localStorage (for demo)
-        const list = JSON.parse(localStorage.getItem('leads') || '[]');
-        list.push({email: email, ts: Date.now()});
-        localStorage.setItem('leads', JSON.stringify(list));
-      } catch (e) { /* ignore */ }
-
-      submitBtn.innerText = 'Dzięki!';
-      submitBtn.disabled = true;
-      setTimeout(()=> {
-        submitBtn.innerText = 'Zapisz mnie';
-        submitBtn.disabled = false;
-        emailInput.value = '';
-      }, 1800);
-    });
-  })();
-
-  // Contact form basic handler (replace with real endpoint)
-  (function(){
-    const contactForm = document.getElementById('contactForm');
-    contactForm.addEventListener('submit', function(e){
-      e.preventDefault();
-      const name = document.getElementById('contactName').value.trim();
-      const email = document.getElementById('contactEmail').value.trim();
-      const msg = document.getElementById('contactMessage').value.trim();
-      if(!name || !email) { alert('Wypełnij imię i e-mail'); return; }
-      // In production: POST to your backend or to a form service
-      alert('Dziękujemy — odezwiemy się wkrótce.');
-      contactForm.reset();
-    });
-  })();
-  </script>
-
-  <!--
-    DODATKOWE WSKAZÓWKI:
-    - MAILCHIMP: zamień formularz zapisu (leadForm) action na link Mailchimp i ustaw method="post".
-    - NETLIFY: aby korzystać z Netlify Forms, ustaw <form name="lead" method="POST" data-netlify="true"> i usuń JS submit handler.
-    - ANALYTICS: dodaj GA4/Pixel według potrzeby w <head>.
-    - GDPR: jeśli zbierasz e-maile, rozważ dodać politykę prywatności i baner cookies.
-  -->
-  <!-- Globe.gl (Three.js) - rotatable 3D globe with hover sound and tooltip -->
-  <script src="https://unpkg.com/three@0.152.2/build/three.min.js"></script>
-  <script src="https://unpkg.com/globe.gl"></script>
-  <script>
-    (function(){
-      // sample event points across the globe
-      const events = [
-        {lat:52.2297, lng:21.0122, name:'Koncert w Warszawie'},
-        {lat:51.5074, lng:-0.1278, name:'Targi w Londynie'},
-        {lat:40.7128, lng:-74.0060, name:'Spotkanie w Nowym Jorku'},
-        {lat:35.6895, lng:139.6917, name:'Warsztaty w Tokio'},
-        {lat:-22.9068, lng:-43.1729, name:'Festiwal w Rio'},
-        {lat:-33.9249, lng:18.4241, name:'Wydarzenie w Kapsztadzie'}
-      ];
-
-      const container = document.getElementById('globe');
-      if(!container) return;
-
-      const globe = Globe()(container)
-        .globeImageUrl('https://unpkg.com/three-globe/example/img/earth-dark.jpg')
-        .showAtmosphere(true)
-        .pointsData(events)
-        .pointLat('lat').pointLng('lng')
-        .pointColor(()=>'#ff5a5f')
-        .pointAltitude(0.02)
-        .pointRadius(0.6)
-        .onPointClick(d => { if(d && d.name) alert(d.name); });
-
-      // allow intuitive mouse rotation and zoom
-      const controls = globe.controls();
-      controls.enableZoom = true;
-      controls.autoRotate = false;
-
-      // Tooltip element
-      const tooltip = document.getElementById('globe-tooltip');
-      function showTooltip(x,y,text){
-        tooltip.style.left = (x + 14) + 'px';
-        tooltip.style.top = (y + 14) + 'px';
-        tooltip.textContent = text || 'Dobrego dnia :D';
-        tooltip.style.display = 'block';
-      }
-      function hideTooltip(){ tooltip.style.display = 'none'; }
-
-      // WebAudio: play simple tone while hovering a point
-      let audioCtx = null;
-      let osc = null;
-      let gain = null;
-      function startTone(){
-        try{
-          if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-          if(osc) return; // already playing
-          osc = audioCtx.createOscillator();
-          gain = audioCtx.createGain();
-          osc.type = 'sine';
-          osc.frequency.setValueAtTime(440, audioCtx.currentTime);
-          gain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
-          osc.connect(gain); gain.connect(audioCtx.destination);
-          osc.start();
-          gain.gain.exponentialRampToValueAtTime(0.06, audioCtx.currentTime + 0.02);
-        }catch(e){ console.warn('Audio not allowed:', e); }
-      }
-      function stopTone(){
-        try{
-          if(!gain || !osc) return;
-          gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.06);
-          setTimeout(()=>{
-            try{ osc.stop(); }catch(e){}
-            try{ osc.disconnect(); gain.disconnect(); }catch(e){}
-            osc = null; gain = null;
-            // keep audioCtx alive to avoid re-creation delay; do not close for now
-          },120);
-        }catch(e){}
-      }
-
-      // track hovered point and pointer to position tooltip
-      let hovered = null;
-
-      globe.onPointHover(p => {
-        hovered = p;
-        if(p){
-          // show tooltip with text and start sound
-          showTooltip(container.getBoundingClientRect().left + container.clientWidth/2, container.getBoundingClientRect().top + container.clientHeight/2, 'Dobrego dnia :D');
-          startTone();
-        } else {
-          hideTooltip();
-          stopTone();
+                // Treść
+                contentBusiness.classList.remove('hidden');
+                contentUser.classList.add('hidden');
+            }
         }
-      });
-
-      // reposition tooltip following mouse movements within container
-      container.addEventListener('pointermove', (ev)=>{
-        if(hovered) showTooltip(ev.clientX, ev.clientY, hovered.name || 'Dobrego dnia :D');
-      });
-
-      // ensure audio context resumes on first user gesture (some browsers require user gesture)
-      function resumeAudio(){ if(audioCtx && audioCtx.state === 'suspended') audioCtx.resume(); }
-      ['pointerdown','click','pointermove'].forEach(ev=> document.addEventListener(ev, resumeAudio, {once:true, passive:true}));
-
-    })();
-  </script>
+    </script>
 </body>
 </html>
